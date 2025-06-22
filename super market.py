@@ -1,85 +1,108 @@
+import tkinter as tk
+from tkinter import messagebox, scrolledtext
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import datetime
 
+# GST calculator
 def calculate_gst(bill_amount, gst_rate=0.18):
     return bill_amount * gst_rate
 
+# Email sender
 def send_email(to_email, subject, body):
-    from_email = "emailcom"  
-    from_password = "password"  
+    from_email = "your_email@gmail.com"  
+    from_password = "your_app_password"  # Use app password for Gmail
 
-    # Create the email
     msg = MIMEMultipart()
     msg['From'] = from_email
     msg['To'] = to_email
     msg['Subject'] = subject
-
     msg.attach(MIMEText(body, 'plain'))
 
     try:
-        # Setup the SMTP server
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(from_email, from_password)
-
-        # Send the email
-        text = msg.as_string()
-        server.sendmail(from_email, to_email, text)
-
-        print(f"Email sent successfully to {to_email}!")
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"Failed to send email: {e}")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-    finally:
+        server.sendmail(from_email, to_email, msg.as_string())
         server.quit()
+        messagebox.showinfo("Success", f"Email sent successfully to {to_email}!")
+    except Exception as e:
+        messagebox.showerror("Email Error", f"Failed to send email: {e}")
 
-def main():
-    name = input("Enter your name: ")
-    email = input("Enter your email ID: ")
+# Add product to list
+def add_product():
+    name = entry_product_name.get()
+    try:
+        price = float(entry_product_price.get())
+        products.append((name, price))
+        update_bill_area()
+        entry_product_name.delete(0, tk.END)
+        entry_product_price.delete(0, tk.END)
+    except ValueError:
+        messagebox.showerror("Invalid Input", "Enter a valid price.")
 
-    products = []
-    total_amount = 0
+# Update bill text area
+def update_bill_area():
+    bill_area.delete(1.0, tk.END)
+    total = sum(price for _, price in products)
+    gst = calculate_gst(total)
+    final = total + gst
+    now = datetime.datetime.now()
 
-    while True:
-        product_name = input("Enter product name (or 'done' to finish): ")
-        if product_name.lower() == 'done':
-            break
-        product_price = float(input(f"Enter price for {product_name}: "))
-        products.append((product_name, product_price))
-        total_amount += product_price
+    bill = f"--- Bill Details ---\n"
+    bill += f"Name: {entry_name.get()}\n"
+    bill += f"Email: {entry_email.get()}\n"
+    bill += f"Date: {now.strftime('%Y-%m-%d')}\nTime: {now.strftime('%H:%M:%S')}\n"
+    bill += "\nProducts Purchased:\n"
+    for p, pr in products:
+        bill += f"- {p}: ₹{pr:.2f}\n"
+    bill += f"\nTotal: ₹{total:.2f}\nGST (18%): ₹{gst:.2f}\nFinal Bill: ₹{final:.2f}\n"
+    bill += "---------------------"
+    bill_area.insert(tk.END, bill)
 
-    
-    gst_amount = calculate_gst(total_amount)
-    total_bill = total_amount + gst_amount
+# Send the bill via email
+def process_bill():
+    if not entry_name.get() or not entry_email.get():
+        messagebox.showwarning("Missing Info", "Please enter name and email.")
+        return
+    if not products:
+        messagebox.showwarning("No Products", "Please add at least one product.")
+        return
 
-    
-    current_datetime = datetime.datetime.now()
-    date_str = current_datetime.strftime("%Y-%m-%d")
-    time_str = current_datetime.strftime("%H:%M:%S")
+    send_email(entry_email.get(), "Your Supermarket Bill", bill_area.get(1.0, tk.END))
 
-    
-    bill_details = f"--- Bill Details ---\n"
-    bill_details += f"Name: {name}\n"
-    bill_details += f"Email ID: {email}\n"
-    bill_details += f"Date: {date_str}\n"
-    bill_details += f"Time: {time_str}\n"
-    bill_details += f"Products Purchased:\n"
+# GUI window
+root = tk.Tk()
+root.title("Supermarket Billing System")
+root.geometry("600x600")
 
-    for product, price in products:
-        bill_details += f"- {product}: {price:.2f}\n"
+products = []
 
-    bill_details += f"\nTotal Amount: {total_amount:.2f}\n"
-    bill_details += f"GST (18%): {gst_amount:.2f}\n"
-    bill_details += f"Total Bill: {total_bill:.2f}\n"
-    bill_details += "---------------------"
+# Name and Email
+tk.Label(root, text="Customer Name:").pack()
+entry_name = tk.Entry(root, width=40)
+entry_name.pack()
 
-    print(bill_details)
+tk.Label(root, text="Customer Email:").pack()
+entry_email = tk.Entry(root, width=40)
+entry_email.pack()
 
-    send_email(email, "Your Supermarket Bill", bill_details)
-    print("Bill processing completed!")
+# Product entry
+tk.Label(root, text="Product Name:").pack()
+entry_product_name = tk.Entry(root, width=40)
+entry_product_name.pack()
 
+tk.Label(root, text="Product Price:").pack()
+entry_product_price = tk.Entry(root, width=40)
+entry_product_price.pack()
 
-main()
+# Buttons
+tk.Button(root, text="Add Product", command=add_product).pack(pady=5)
+tk.Button(root, text="Send Bill", command=process_bill).pack(pady=5)
+
+# Bill area
+bill_area = scrolledtext.ScrolledText(root, width=60, height=20)
+bill_area.pack(pady=10)
+
+root.mainloop()
